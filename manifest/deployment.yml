@@ -26,6 +26,8 @@ spec:
           value: "r0VHS2s_HCnKYTgmyFTqUg"
         - name: DATABASE_NAME
           value: "flexibleserverdb"
+        - name: DJANGO_SECRET_KEY
+          value: "dckr_pat_ccjMwah3dF3g8ZH2mqTSIdXAA5M"
 ---
 apiVersion: v1
 kind: Service
