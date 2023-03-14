@@ -1,0 +1,124 @@
+name: kanban-cicd-app
+
+env:
+  JFROG_REGISTRY: cloudattech.jfrog.io
+  JFROG_REPO: container-repo 
+  #JFROG_REGISTRY_USER: ${{ secrets.JFROG_REGISTRY_USER }}
+  #JFROG_REGISTRY_PASSWORD: ${{ secrets.JFROG_REGISTRY_PASSWORD }}
+  VAULT_TOKEN: ${{secrets.VAULT_TOKEN}}
+  #OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
+  #OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
+  OPENSHIFT_NAMESPACE: "amol-tapase-dev"
+  APP_NAME: "kanban-app"
+  TAG: "latest"
+
+#on: [ workflow_dispatch]
+on:
+  workflow_dispatch:
+  #push:
+  #  branches:
+  #   - "main"
+
+jobs:
+  Build:
+    name: Build
+    runs-on: ubuntu-20.04
+    steps:
+        - name: Checkout Sourcecode
+          uses: actions/checkout@v3
+              
+        - name: Import JFROG Secrets
+          id: import-secrets
+          uses: hashicorp/vault-action@v2
+          with:
+            method: token
+            url: https://vault-public-vault-baebe7c1.3dda8bad.z1.hashicorp.cloud:8200
+            namespace: admin/
+            token: ${{ env.VAULT_TOKEN }}
+            tlsSkipVerify: false
+            #caCertificate: ${{ secrets.VAULT_CA_CERT }}
+            secrets: |
+                dev/data/repos JFROG_USER | JFROG_USER ; 
+                dev/data/repos JFROG_PASSWORD | JFROG_PASSWORD
+        #- run: echo $REGISTRY_USER
+
+        #-  name: Set up Docker Buildx
+           #uses: docker/setup-buildx-action@v2
+
+        -  name: Login to Jfrog Repository
+           uses: docker/login-action@v2
+           with:
+            registry: ${{ env.JFROG_REGISTRY }}
+            username: ${{ steps.import-secrets.outputs.JFROG_USER }}
+            password: ${{ steps.import-secrets.outputs.JFROG_PASSWORD }}
+        
+        - name: Build and push
+          uses: docker/build-push-action@v4
+          with:
+           context: ./kanban-app
+           #file: ./kanban-app/Dockerfile
+           push: true
+           tags: |
+              ${{ env.JFROG_REGISTRY }}/${{ env.JFROG_REPO }}/${{ env.APP_NAME }}:${{ env.TAG }}
+            #${{ env.JFROG_REGISTRY }}/${{ env.JFROG_REPO }}/${{ env.APP_NAME }}:${{ github.sha }}
+           #cache-from: type=local,src=/tmp/.buildx-cache
+           #cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+           #cache-from: type=gha
+           #cache-to: type=gha,mode=max
+
+        #-   name: Move cache
+            #run: |
+             #rm -rf /tmp/.buildx-cache
+             #mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+  Deploy:      
+    name: Deploy
+    runs-on: ubuntu-20.04
+    needs: [ Build ]
+    steps:
+        - name: Checkout Sourcecode
+          uses: actions/checkout@v3
+
+        - name: Import ARO Cluster Secrets
+          id: import-secrets
+          uses: hashicorp/vault-action@v2
+          with:
+            method: token
+            url: https://vault-public-vault-baebe7c1.3dda8bad.z1.hashicorp.cloud:8200
+            namespace: admin/
+            token: ${{ env.VAULT_TOKEN }}
+            tlsSkipVerify: false
+            #caCertificate: ${{ secrets.VAULT_CA_CERT }}
+            secrets: |
+                dev/data/aro-cluster OPENSHIFT_SERVER | OPENSHIFT_SERVER ; 
+                dev/data/aro-cluster OPENSHIFT_TOKEN | OPENSHIFT_TOKEN ;
+                dev/data/repos JFROG_USER | JFROG_USER ; 
+                dev/data/repos JFROG_PASSWORD | JFROG_PASSWORD
+        - name: Login to ARO Cluster
+          id: set-aro-context
+          uses: redhat-actions/oc-login@v1
+          with:
+            openshift_server_url: ${{ steps.import-secrets.outputs.OPENSHIFT_SERVER }}
+            openshift_token: ${{ steps.import-secrets.outputs.OPENSHIFT_TOKEN }}
+            insecure_skip_tls_verify: true
+            namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+        
+        - name: Set ImagePullSecrets
+          id: image_secret
+          uses: Azure/k8s-create-secret@v1.1
+          with:
+            namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+            container-registry-url: ${{ env.JFROG_REGISTRY }}
+            container-registry-username: ${{ steps.import-secrets.outputs.JFROG_USER }}
+            container-registry-password: ${{ steps.import-secrets.outputs.JFROG_PASSWORD }}
+            secret-name: kanban-app-secrets
+
+        - name: Deploy application
+          id: deploy-app
+          uses: Azure/k8s-deploy@v4.9
+          with:
+            namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+            manifests: |
+              manifests/kanban-app-backend-deployment.yml
+              manifests/kanban-app-backend-service.yml
+            imagepullsecrets: |
+              kanban-app-secrets
