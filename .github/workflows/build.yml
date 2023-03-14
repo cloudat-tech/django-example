@@ -9,7 +9,7 @@ env:
   #OPENSHIFT_SERVER: ${{ secrets.OPENSHIFT_SERVER }}
   #OPENSHIFT_TOKEN: ${{ secrets.OPENSHIFT_TOKEN }}
   OPENSHIFT_NAMESPACE: "amol-tapase-dev"
-  APP_NAME: "kanban-app"
+  APP_NAME: "django-polls"
   TAG: "latest"
 
 #on: [ workflow_dispatch]
@@ -55,7 +55,7 @@ jobs:
         - name: Build and push
           uses: docker/build-push-action@v4
           with:
-           context: ./kanban-app
+           context: .
            #file: ./kanban-app/Dockerfile
            push: true
            tags: |
@@ -110,7 +110,7 @@ jobs:
             container-registry-url: ${{ env.JFROG_REGISTRY }}
             container-registry-username: ${{ steps.import-secrets.outputs.JFROG_USER }}
             container-registry-password: ${{ steps.import-secrets.outputs.JFROG_PASSWORD }}
-            secret-name: kanban-app-secrets
+            secret-name: django-app-secrets
 
         - name: Deploy application
           id: deploy-app
@@ -118,7 +118,6 @@ jobs:
           with:
             namespace: ${{ env.OPENSHIFT_NAMESPACE }}
             manifests: |
-              manifests/kanban-app-backend-deployment.yml
-              manifests/kanban-app-backend-service.yml
+              manifests/deployment.yml
             imagepullsecrets: |
-              kanban-app-secrets
+             django-app-secrets
