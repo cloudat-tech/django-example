@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django-app
+  template:
+    metadata:
+      labels:
+        app: django-app
+    spec:
+      containers:
+      - name: django-app
+        image: kyndryl.jfrog.io/kps-platform-zeusapp-docker-local/django-app:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_HOST
+          value: "my-postgresdb.postgres.database.azure.com"
+        - name: DATABASE_USER
+          value: "prizejay1"
+        - name: DATABASE_PASSWORD
+          value: "r0VHS2s_HCnKYTgmyFTqUg"
+        - name: DATABASE_NAME
+          value: "flexibleserverdb"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: python-svc
+spec:
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  selector:
+    app: django-app
