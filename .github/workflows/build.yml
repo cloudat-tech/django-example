@@ -1,4 +1,4 @@
-name: kanban-cicd-app
+name: cicd
 
 env:
   JFROG_REGISTRY: cloudattech.jfrog.io
