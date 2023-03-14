@@ -118,6 +118,6 @@ jobs:
           with:
             namespace: ${{ env.OPENSHIFT_NAMESPACE }}
             manifests: |
-              manifests/deployment.yml
+              manifest/deployment.yml
             imagepullsecrets: |
              django-app-secrets
