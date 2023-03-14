@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: django-app
-        image: kyndryl.jfrog.io/kps-platform-zeusapp-docker-local/django-app:latest
+        image: cloudattech.jfrog.io/container-repo/django-polls:latest
         ports:
         - containerPort: 8000
         env:
