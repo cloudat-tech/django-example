@@ -1,26 +1,26 @@
-# Use the official Python image from the Docker Hub
+FROM python:3.7.4-alpine3.10
 
-FROM python:3.8.2
+ADD django-polls/requirements.txt /app/requirements.txt
 
-# Expose app on port 8000
+RUN set -ex \
+    && apk add --no-cache --virtual .build-deps postgresql-dev build-base \
+    && python -m venv /env \
+    && /env/bin/pip install --upgrade pip \
+    && /env/bin/pip install --no-cache-dir -r /app/requirements.txt \
+    && runDeps="$(scanelf --needed --nobanner --recursive /env \
+        | awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
+        | sort -u \
+        | xargs -r apk info --installed \
+        | sort -u)" \
+    && apk add --virtual rundeps $runDeps \
+    && apk del .build-deps
+
+ADD django-polls /app
+WORKDIR /app
+
+ENV VIRTUAL_ENV /env
+ENV PATH /env/bin:$PATH
+
 EXPOSE 8000
 
-# Make a new directory to put our code in.
-
-RUN mkdir /code
-
-# Change the working directory.
-
-WORKDIR /code
-
-# Copy to code folder
-
-COPY . /code/
-
-# Install the requirements.
-
-RUN pip install -r requirements.txt
-
-# Run the application:
-
-CMD python manage.py runserver 0.0.0.0:8000
+CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "mysite.wsgi"]
